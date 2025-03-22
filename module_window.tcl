@@ -1157,7 +1157,7 @@ grid columnconfigure .main 0 -weight 1
 proc on_selected_pane_change {name element op} {
     global selected_pane
     # puts "selected_pane changed to: $selected_pane"
-
+    save_changes; 
     # Call the necessary functions
     update_comment
     update_marks
