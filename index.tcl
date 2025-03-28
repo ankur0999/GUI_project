@@ -1,18 +1,58 @@
 package require Tk
-source /usr/share/tcltk/tk8.6/ttk/ttk.tcl
-
-
 
 set current_dir ""
+set attached_file "module_window.tcl";
+
+
 # Function to select a folder
 proc select_folder {} {
     global current_dir  ;
-    set current_dir [tk_chooseDirectory -title "Select project Folder"]
     
-    if {$current_dir ne ""} {
-        .middle.loc_entry delete 0 end
-        .middle.loc_entry insert 0 $current_dir
-        load_modules $current_dir
+    # Define config directory adn file path
+    set config_dir "~/.config/my_app";
+    set last_dir_file "$config_dir/last_dir.txt";
+    
+    # Create config directory if it doesn't exists
+    if { ![file exists $config_dir]} {
+        file mkdir $config_dir;
+    }
+    
+    # Load last directory rom file (if it exists)
+    if { [file exists $last_dir_file]} {
+        set fp [open $last_dir_file r]
+        gets $fp last_selected_dir
+        close $fp
+    } else {
+        set last_selected_dir [pwd] ;# Default to current directory
+    }
+    
+    # Make sure last_selected_dir exist
+    if { ![file isdirectory $last_selected_dir] } {
+    	set last_selected_dir [pwd];
+    }
+    
+    # Open directory chooser starting from last remembered locatiohn
+    set selected_dir [tk_chooseDirectory -title "Select Project Folder" -initialdir $last_selected_dir]
+    
+    # if user do not select directory, stop further execution	
+    if { $selected_dir eq "" } {
+        puts "Please select a directory";
+        return;
+    }
+    
+    # store the selected_dir for future use
+    set current_dir $selected_dir
+        
+    #Save selected directory to file
+    set fp [open $last_dir_file w]
+    puts $fp $selected_dir
+    close $fp
+        
+        
+    if { [load_modules $current_dir] == 1 } {
+        .top.loc_entry delete 0 end
+        .top.loc_entry insert 0 $current_dir
+        .top.loc_entry xview moveto 1 
     }
 }
 
@@ -21,7 +61,7 @@ proc load_modules {folder} {
     set file_path "$folder/.SubModuleList.csv"
     if {![file exists $file_path]} {
         tk_messageBox -message "Error: .SubModuleList.csv not found!" -icon error
-        return
+        return 0;
     }
 
     set fp [open $file_path r]
@@ -37,97 +77,73 @@ proc load_modules {folder} {
     }
 
     # Update the dropdown menu and set the first value as default
-    .middle.module_combo configure -values $module_list -state normal
-    .middle.module_combo set [lindex $module_list 0]  ;# Set first value as default
-    .right.start_button configure -state normal
+    .bottom.module_label configure -state normal
+    .bottom.module_combo configure -values $module_list -state normal
+    .bottom.module_combo set [lindex $module_list 0]  ;# Set first value as default
+    .bottom.start_button configure -state normal
+    
+    return 1;
 }
 
 # Function to launch the module window
 proc open_module_window {} {
     # Close the main index window
-    global current_dir  ;
-    set module_folder "[.middle.module_combo get]"
-    destroy .
-    exec wish module_window.tcl "$current_dir" "$module_folder" &
+    global current_dir  attached_file;
+    set module_folder "[.bottom.module_combo get]"
+    #destroy .
+    exec wish $attached_file $current_dir $module_folder &
 }
-
-# Title and Geometry
-wm title . "aut0G"
-wm geometry . 550x100
-
-# Main Frame (Contains Left, Middle, Right Frames)
-frame .main -padx 5 -pady 5
-grid .main -row 0 -column 0 -sticky news
-
-# Configure main window to expand properly
-# grid rowconfigure . 0 -weight 1
-grid columnconfigure . 1 -weight 1
-
-# Create Frames
-frame .left -padx 2 -pady 0
-frame .middle -padx 2 -pady 0
-frame .right -padx 2 -pady 0
-
-# Place Frames inside Main Frame
-grid .left -row 0 -column 0 -sticky w
-grid .middle -row 0 -column 1 -sticky ew
-grid .right -row 0 -column 2 -sticky e
-
-# Make Middle Frame Expandable
-grid columnconfigure .main 1 -weight 1
-
-# Labels in Left Frame
-font create myFont -family "Arial" -size 11 -weight bold
-label .left.local_label -text "Project Location" -font myFont
-label .left.module_label -text "Select Module" -font myFont
-grid .left.local_label -row 0 -column 0 -sticky w -padx 5 -pady {0 10}
-grid .left.module_label -row 1 -column 0 -sticky w -padx 5 -pady {10 10}
-
-# Entry & ComboBox in Middle Frame
-entry .middle.loc_entry -width 30 -font {Arial 12 normal}
-ttk::combobox .middle.module_combo -width 28 -state disabled -font {Arial 12 normal}
-grid .middle.loc_entry -row 0 -column 0 -padx 5 -pady {0 10} -sticky ew
-grid .middle.module_combo -row 1 -column 0 -padx 5 -pady {2 10} -sticky ew
-
-# Make Middle Column Expandable
-grid columnconfigure .middle 0 -weight 1
-
-# Buttons in Right Frame
-button .right.select_project -text "Select Project" -command select_folder -font myFont
-button .right.start_button -text "Start/Resume" -state disabled -command open_module_window -font myFont
-grid .right.select_project -row 0 -column 0 -padx 2 -pady {0 10} -sticky e
-grid .right.start_button -row 1 -column 0 -padx 2 -pady {2 10} -sticky e
-
 
 
 
 # GUI Elements
-#font create myFont -family Arial -size 12 -weight bold
-# font create myFont -family "Handwritten Look" -size 11 -weight bold
-# frame .top -padx 5 -pady 5
-# label .top.loc_label -text "Project Location" -font myFont
-# entry .top.loc_entry -width 30 -font {Arial 12 normal }
-# button .top.select_project -text "Select Project" -command select_folder -font myFont
-# grid .top.loc_label -row 0 -column 0
-# grid .top.loc_entry -row 0 -column 1
-# grid .top.select_project -row 0 -column 2
-# pack .top -in .main -fill x
-# pack .top.loc_label .top.loc_entry .top.select_project -side left -padx 5 -fill x -expand 1
+#wm geometry . 400x227
+wm title . "autog"
 
-# frame .bottom -padx 10 -pady 5
-# label .bottom.module_label -text "Select Module" -font myFont
-# ttk::combobox .bottom.module_combo -width 28 -state disabled -font {Arial 12 normal}
-# button .bottom.start_button -text "Start/Resume" -state disabled -command open_module_window -font myFont
-# grid .bottom.module_label -row 0 -column 0 -padx {5 16}
-# grid .bottom.module_combo -row 0 -column 1
-# grid .bottom.start_button -row 0 -column 2
-# pack .bottom -in .main -fill x
-# pack .bottom.module_label .bottom.module_combo .bottom.start_button -side left -padx 5 -fill x -expand 1
+# Main Frame (Holds Everything)
+frame .main -padx 0 -pady 0
+grid .main -row 0 -column 0 -sticky nsew
 
-# Pack main frames after defining all elements
-# pack .top .bottom -side top -fill x
+# Ensure ".main" expands within the root window
+grid rowconfigure . 0 -weight 1
+grid columnconfigure . 0 -weight 1
 
-# Run GUI event loop
-if {[info exists tk_version]} {
-    vwait forever
-}
+
+# Custom font
+font create myFont -family "Helvetica" -size 12 -weight normal
+
+# Top frame
+frame .top -padx 2 -pady 10 
+label .top.loc_label -text "Project Location" -font myFont
+entry .top.loc_entry -width 30 -font largeFont
+button .top.select_project -text "Select Project" -command select_folder -font myFont
+grid .top.loc_label -row 0 -column 0 -sticky w -padx {3 5}
+grid .top.loc_entry -row 0 -column 1 -sticky ew -padx {1 5}
+grid .top.select_project -row 0 -column 2 -sticky e -padx {25 15}
+
+# Ensure entryBox Expand in Width
+grid columnconfigure .top 1 -weight 1
+
+
+# Bottom frame
+frame .bottom -padx 2 -pady 10
+label .bottom.module_label -text "Select Module" -font myFont -state disabled
+ttk::combobox .bottom.module_combo -width 25 -state readonly -state disabled -font largeFont
+button .bottom.start_button -text "Start/Resume" -state disabled -command open_module_window -font myFont
+
+grid .bottom.module_label -row 0 -column 0 -sticky w -padx {3 20}
+grid .bottom.module_combo -row 0 -column 1 -sticky ew -padx {1 25}
+grid .bottom.start_button -row 0 -column 2 -sticky e -padx {2 15}
+
+# Ensure entryBox Expand in Width
+grid columnconfigure .bottom 1 -weight 1
+
+# Attach Top Frame to Main Layout
+grid .top -in .main -row 0 -column 0 -sticky new
+grid .bottom -in .main -row 1 -column 0 -sticky new
+grid rowconfigure .main 0 -weight 0
+grid columnconfigure .main 0 -weight 1
+
+
+
+
